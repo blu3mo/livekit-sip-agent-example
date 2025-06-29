@@ -1,17 +1,19 @@
 import {
   type JobContext,
+  type JobProcess,
   WorkerOptions,
   cli,
   defineAgent,
   llm,
-  multimodal,
+  pipeline,
 } from '@livekit/agents';
 import * as openai from '@livekit/agents-plugin-openai';
+import * as cartesia from '@livekit/agents-plugin-cartesia';
+import * as deepgram from '@livekit/agents-plugin-deepgram';
+import * as silero from '@livekit/agents-plugin-silero';
 import { RoomServiceClient } from 'livekit-server-sdk';
-import { fileURLToPath } from 'url';
 
 import { verifyEnv } from './env.js';
-
 
 const {
   LIVEKIT_API_KEY = '',
@@ -30,16 +32,17 @@ const roomServiceClient = new RoomServiceClient(
 );
 
 export default defineAgent({
+  prewarm: async (proc: JobProcess) => {
+    // VADをプリロード
+    proc.userData.vad = await silero.VAD.load();
+  },
   entry: async (ctx: JobContext) => {
-    await ctx.connect();
-    console.log('waiting for participant');
-    const participant = await ctx.waitForParticipant();
-    console.log(`starting assistant example agent for ${participant.identity}`);
-    let callerPoints = 0;
-    let agentPoints = 0;
+    const vad = ctx.proc.userData.vad! as silero.VAD;
 
-    const model = new openai.realtime.RealtimeModel({
-      instructions: `あなたは市民と電話をしている選挙期間中の参議院選挙比例候補/新党「チームみらい」の党首です。質問を受けた場合は回答してください。質問がない場合は、普段の生活における困りごと・不満・要望を聞いてください。
+    // 初期のチャットコンテキストを作成
+    const initialContext = new llm.ChatContext().append({
+      role: llm.ChatRole.SYSTEM,
+      text: `あなたは市民と電話をしている選挙期間中の参議院選挙比例候補/新党「チームみらい」の党首です。質問を受けた場合は回答してください。質問がない場合は、普段の生活における困りごと・不満・要望を聞いてください。
 一文は短く、回答は簡潔に分かりやすくお願いします。
 # あなたの情報
 * 名前: あんの たかひろ
@@ -65,68 +68,37 @@ export default defineAgent({
 * 複数の点について語るときは、「第一に〜。第二に〜。」というように、話し言葉で順序をつけて語る。`,
     });
 
-    const fncCtx: llm.FunctionContext = {
-      gameEnd: {
-        description: 'End the game and delete the room',
-        parameters: {},
-        execute: async () => {
-          console.log('Waiting for 20 seconds before deleting room...');
+    await ctx.connect();
+    console.log('waiting for participant');
+    const participant = await ctx.waitForParticipant();
+    console.log(`starting assistant example agent for ${participant.identity}`);
 
-          // Schedule disconnection
-          setTimeout(async () => {
-            console.log('Deleting room...');
-            await roomServiceClient.deleteRoom(ctx.room.name!);
-          }, 20000);
-
-          return 'Game over, thank you for playing. Goodbye!';
-        },
-      },
-      userPoints: {
-        description: 'When the caller gets a point, call this function',
-        parameters: {},
-        execute: async () => {
-          callerPoints++;
-          console.log(
-            `callerPoints: ${callerPoints}, agentPoints: ${agentPoints}`,
-          );
-          return `That is correct. You currently have ${callerPoints} points.`;
-        },
-      },
-      systemPoints: {
-        description: 'When the system gets a point, call this function',
-        parameters: {},
-        execute: async () => {
-          agentPoints++;
-          console.log(
-            `callerPoints: ${callerPoints}, agentPoints: ${agentPoints}`,
-          );
-          return `That is incorrect. I currently have ${agentPoints} points.`;
-        },
-      },
-      pointsStatus: {
-        description: 'When a caller asks about the points, call this function',
-        parameters: {},
-        execute: async () => {
-          console.log('The user asked about the points.');
-          return `You currently have ${callerPoints} points and I currently have ${agentPoints} points.`;
-        },
-      },
-    };
-
-    const agent = new multimodal.MultimodalAgent({ model, fncCtx });
-    const session = await agent
-      .start(ctx.room, participant)
-      .then(session => session as openai.realtime.RealtimeSession);
-
-    session.conversation.item.create(
-      new llm.ChatMessage({
-        role: llm.ChatRole.ASSISTANT,
-        content:
-          'Greet the caller as Tike Mrapp, host of Um, Actually, and explain the rules of the game.',
+    // VoicePipelineAgentを作成
+    const agent = new pipeline.VoicePipelineAgent(
+      vad,
+      new deepgram.STT({
+        language: 'ja', // 日本語設定
+        model: "nova-2-general"
       }),
+      new openai.LLM({
+        model: 'gpt-4o-mini',
+      }),
+      new cartesia.TTS({
+        voice: '881cd300-2d71-4d3e-aa0b-5478c3ccad1e', // 日本語対応の音声IDに変更が必要
+        model: 'sonic-2',
+      }),
+      {
+        chatCtx: initialContext,
+      }
     );
-    session.response.create();
+
+    // エージェントを開始
+    agent.start(ctx.room, participant);
+
+    // 初期の挨拶
+    await agent.say(
+      'こんにちは。私はチームみらいの党首、あんのたかひろです。何かお困りのことやご質問はありませんか？',
+      true // allowInterruptions
+    );
   },
 });
-
-cli.runApp(new WorkerOptions({ agent: fileURLToPath(import.meta.url) }));
