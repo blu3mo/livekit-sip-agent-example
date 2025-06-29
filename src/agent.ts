@@ -13,6 +13,8 @@ import * as deepgram from '@livekit/agents-plugin-deepgram';
 import * as silero from '@livekit/agents-plugin-silero';
 import { RoomServiceClient } from 'livekit-server-sdk';
 
+import { fileURLToPath } from 'url';
+
 import { verifyEnv } from './env.js';
 
 const {
@@ -84,8 +86,9 @@ export default defineAgent({
         model: 'gpt-4o-mini',
       }),
       new cartesia.TTS({
-        voice: '881cd300-2d71-4d3e-aa0b-5478c3ccad1e', // 日本語対応の音声IDに変更が必要
+        voice: '1e1f6149-cd89-4073-82a3-339d32c15ad9', // 日本語対応の音声IDに変更が必要
         model: 'sonic-2',
+        language: 'ja',
       }),
       {
         chatCtx: initialContext,
@@ -97,8 +100,10 @@ export default defineAgent({
 
     // 初期の挨拶
     await agent.say(
-      'こんにちは。私はチームみらいの党首、あんのたかひろです。何かお困りのことやご質問はありませんか？',
+      'こんにちは。私は新党チームみらいの党しゅ、「あんの」「たかひろ」です。我々について何でも聞いてください。',
       true // allowInterruptions
     );
   },
 });
+
+cli.runApp(new WorkerOptions({ agent: fileURLToPath(import.meta.url) }));
