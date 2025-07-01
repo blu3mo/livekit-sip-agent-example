@@ -5,20 +5,22 @@ The agent uses OpenAI's capabilities to process and respond to voice calls and h
 
 ## Prerequisites 📋
 
-- Node.js (v18 or higher) 💻
+- Python 3.8 or higher 🐍
+- Node.js (v18 or higher) for setup scripts 💻
 - A LiveKit server instance 📡
 - A Twilio account with SIP trunking capabilities 🌐
-- An OpenAI API key 🔑
+- API keys for AI services 🔑
 
 ## Project Structure 📂
 
 ```txt
 .
+├── agent.py             # Main agent implementation (Python)
+├── requirements.txt     # Python dependencies
 ├── src/
-│   ├── agent.ts         # Main agent implementation
 │   ├── setup-livekit.ts # LiveKit setup script
 │   └── setup-twilio.ts  # Twilio setup script
-├── .env.example         # Example environment variables, copy to .env.local and fill in your own values
+├── .env.example         # Example environment variables
 ```
 
 ## Setup 🛠️
@@ -30,31 +32,39 @@ The agent uses OpenAI's capabilities to process and respond to voice calls and h
    cd livekit-sip-agent-example
    ```
 
-2. Install dependencies:
+2. Install Node.js dependencies (for setup scripts):
 
    ```bash
    npm install
    ```
 
-3. Create your environment file:
+3. Install Python dependencies:
 
    ```bash
-   cp .env.example .env.local
+   pip install -r requirements.txt
    ```
 
-4. Configure your environment variables in `.env.local`:
+4. Create your environment file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+5. Configure your environment variables in `.env`:
    - `LIVEKIT_API_KEY`: Your LiveKit API key
    - `LIVEKIT_API_SECRET`: Your LiveKit API secret
    - `LIVEKIT_URL`: Your LiveKit server URL
    - `LIVEKIT_SIP_URI`: Your LiveKit SIP URI
    - `OPENAI_API_KEY`: Your OpenAI API key
+   - `DEEPGRAM_API_KEY`: Your Deepgram API key
+   - `CARTESIA_API_KEY`: Your Cartesia API key
    - `TWILIO_PHONE_NUMBER`: Your Twilio phone number
    - `TWILIO_ACCOUNT_SID`: Your Twilio account SID
    - `TWILIO_AUTH_TOKEN`: Your Twilio auth token
    - `TWILIO_SIP_USERNAME`: Your Twilio SIP username (You may end up generating this after running the setup script)
    - `TWILIO_SIP_PASSWORD`: Your Twilio SIP password (You may end up generating this after running the setup script)
 
-5. Set up Twilio:
+6. Set up Twilio:
 
    ```bash
    npm run setup:twilio
@@ -62,7 +72,7 @@ The agent uses OpenAI's capabilities to process and respond to voice calls and h
 
    This will follow the steps outlined in the LiveKit [Create and configure a Twilio SIP trunk](https://docs.livekit.io/sip/quickstarts/configuring-twilio-trunk/) guide. You will need to have a Twilio account and a phone number. Be sure to follow the steps in the [Inbound calls with Twilio Voice](https://docs.livekit.io/sip/accepting-calls-twilio-voice/) guide after running the setup script.
 
-6. Set up LiveKit:
+7. Set up LiveKit:
 
    ```bash
    npm run setup:livekit
@@ -75,7 +85,7 @@ The agent uses OpenAI's capabilities to process and respond to voice calls and h
 To start the agent:
 
 ```bash
-npm run agent
+python agent.py
 ```
 
 The agent will now be ready to receive SIP calls through your Twilio phone number.
@@ -85,18 +95,16 @@ The agent will now be ready to receive SIP calls through your Twilio phone numbe
 1. When a call comes in through your Twilio phone number, it's routed to your LiveKit SIP URI
 2. The LiveKit agent receives the call and establishes a connection to a room
 3. A LiveKit Agent is automatically dispatched to join the room
-4. The agent uses OpenAI's capabilities host a game of "Um, Actually" with the caller
+4. The agent uses OpenAI's capabilities to process the call audio, transcribe it using Deepgram, and generate responses
 
-## Agent Functions 🤖
+## Python Implementation Details 🐍
 
-The agent has several built-in functions to manage the game:
+The Python version uses the LiveKit Python SDK with the following key components:
 
-- `gameEnd`: Ends the game and deletes the room after a 20-second delay
-- `userPoints`: Tracks when the caller earns a point and updates their score
-- `systemPoints`: Tracks when the agent earns a point and updates their score
-- `pointsStatus`: Provides the current score status when requested by the caller
-
-The agent maintains a running score throughout the game, tracking points for both the caller and itself. The game continues until either party ends the call or the `gameEnd` function is triggered.
+- `WorkerOptions(entrypoint_fnc=...)` for agent definition
+- `AgentSession` for voice pipeline management
+- Integration with Deepgram (STT), OpenAI (LLM), and Cartesia (TTS)
+- Silero VAD for voice activity detection
 
 ## License 📝
 
