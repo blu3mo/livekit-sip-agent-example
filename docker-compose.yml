@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  livekit-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: livekit-sip-agent
+    restart: always  # 停止したら自動的に再起動
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - CARTESIA_API_KEY=${CARTESIA_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs  # ログファイルをホストにマウント（必要に応じて）
+    networks:
+      - livekit-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+networks:
+  livekit-network:
+    driver: bridge
