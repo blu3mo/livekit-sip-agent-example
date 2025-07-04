@@ -17,7 +17,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./logs:/app/logs  # ログファイルをホストにマウント（必要に応じて）
+      - ./conversation_logs:/app/conversation_logs  # 会話ログを永続化
     networks:
       - livekit-network
     deploy:

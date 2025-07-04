@@ -217,7 +217,7 @@ async def entrypoint(ctx: JobContext):
     
     # 会話記録用のイベントリスナーを設定
     @session.on("user_input_transcribed")
-    async def on_user_input_transcribed(event):
+    def on_user_input_transcribed(event):
         """ユーザーの発話がテキストに変換されたとき"""
         if event.is_final:  # 最終的な認識結果の場合のみ記録
             recorder.add_message("user", event.transcript, {
@@ -226,7 +226,7 @@ async def entrypoint(ctx: JobContext):
             print(f"User: {event.transcript}")
     
     @session.on("agent_speech_committed")
-    async def on_agent_speech(event):
+    def on_agent_speech(event):
         """エージェントの発話がコミットされたとき"""
         recorder.add_message("agent", event.source, {
             "event_type": "speech_committed"
@@ -247,9 +247,6 @@ async def entrypoint(ctx: JobContext):
             greeting,
             allow_interruptions=True
         )
-        
-        # セッションが終了するまで待機
-        await ctx.wait_for_disconnect()
     
     finally:
         # セッション終了時に会話記録を保存
