@@ -1,13 +1,14 @@
 import asyncio
 import os
-from typing import Any
+from typing import Any, Dict
 
 from dotenv import load_dotenv
 from livekit import agents
-from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions, WorkerOptions
+from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions, WorkerOptions, llm
 from livekit.plugins import cartesia, deepgram, openai, silero
 
 from env import verify_env
+from conversation_recorder import ConversationRecorder
 
 # 環境変数をロード
 load_dotenv()
@@ -30,7 +31,8 @@ LIVEKIT_URL = env_vars['LIVEKIT_URL']
 class TeamMiraiAgent(Agent):
     """チームみらいの党首エージェント"""
     
-    def __init__(self) -> None:
+    def __init__(self, recorder: ConversationRecorder) -> None:
+        self.recorder = recorder
         instructions = """あなたは市民と電話をしている選挙期間中の参議院選挙比例候補/新党「チームみらい」の党首のAIです。質問を受けた場合は回答してください。
 一文は短く、回答は誰にでも伝わるように分かりやすくお願いします。
 
@@ -182,6 +184,9 @@ class TeamMiraiAgent(Agent):
 async def entrypoint(ctx: JobContext):
     """エージェントのエントリーポイント"""
     
+    # 会話記録の初期化
+    recorder = ConversationRecorder()
+    
     # 接続を確立
     await ctx.connect()
     print('waiting for participant')
@@ -189,6 +194,9 @@ async def entrypoint(ctx: JobContext):
     # 参加者を待機
     participant = await ctx.wait_for_participant()
     print(f'starting assistant example agent for {participant.identity}')
+    
+    # 参加者情報を記録
+    recorder.set_participant(participant.identity)
     
     # AgentSessionを作成
     session = AgentSession(
@@ -207,17 +215,50 @@ async def entrypoint(ctx: JobContext):
         vad=silero.VAD.load(),
     )
     
+    # 会話記録用のイベントリスナーを設定
+    @session.on("user_input_transcribed")
+    async def on_user_input_transcribed(event):
+        """ユーザーの発話がテキストに変換されたとき"""
+        if event.is_final:  # 最終的な認識結果の場合のみ記録
+            recorder.add_message("user", event.transcript, {
+                "is_final": event.is_final
+            })
+            print(f"User: {event.transcript}")
+    
+    @session.on("agent_speech_committed")
+    async def on_agent_speech(event):
+        """エージェントの発話がコミットされたとき"""
+        recorder.add_message("agent", event.source, {
+            "event_type": "speech_committed"
+        })
+        print(f"Agent: {event.source}")
+    
     # カスタムエージェントを作成
-    agent = TeamMiraiAgent()
+    agent = TeamMiraiAgent(recorder)
     
-    # セッションを開始
-    await session.start(room=ctx.room, agent=agent)
+    try:
+        # セッションを開始
+        await session.start(room=ctx.room, agent=agent)
+        
+        # 初期の挨拶
+        greeting = 'はい、お電話ありがとうございます。新党チームみらいの、党首、あんの、たかひろ、のAIです。もしよろしければ、今回お電話をくださったきっかけから、お伺いしてもよろしいですか？'
+        recorder.add_message("agent", greeting)
+        await session.say(
+            greeting,
+            allow_interruptions=True
+        )
+        
+        # セッションが終了するまで待機
+        await ctx.wait_for_disconnect()
     
-    # 初期の挨拶
-    await session.say(
-        'はい、お電話ありがとうございます。新党チームみらいの、党首、あんの、たかひろ、のAIです。もしよろしければ、今回お電話をくださったきっかけから、お伺いしてもよろしいですか？',
-        allow_interruptions=True
-    )
+    finally:
+        # セッション終了時に会話記録を保存
+        try:
+            file_path = recorder.save()
+            print(f"Conversation saved to: {file_path}")
+            print(f"Summary: {recorder.get_summary()}")
+        except Exception as e:
+            print(f"Failed to save conversation: {e}")
 
 
 if __name__ == "__main__":
