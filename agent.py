@@ -197,10 +197,6 @@ async def entrypoint(ctx: JobContext):
     
     # 参加者情報を記録
     recorder.set_participant(participant.identity)
-
-    print(get_optional_env('OPENROUTER_MODEL'))
-    print(get_optional_env('OPENROUTER_API_KEY'))
-    print(get_optional_env('OPENROUTER_BASE_URL'))
     
     # AgentSessionを作成
     session = AgentSession(
