@@ -7,7 +7,7 @@ from livekit import agents
 from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions, WorkerOptions, llm
 from livekit.plugins import cartesia, deepgram, openai, silero
 
-from env import verify_env
+from env import verify_env, get_optional_env
 from conversation_recorder import ConversationRecorder
 
 # 環境変数をロード
@@ -197,6 +197,10 @@ async def entrypoint(ctx: JobContext):
     
     # 参加者情報を記録
     recorder.set_participant(participant.identity)
+
+    print(get_optional_env('OPENROUTER_MODEL'))
+    print(get_optional_env('OPENROUTER_API_KEY'))
+    print(get_optional_env('OPENROUTER_BASE_URL'))
     
     # AgentSessionを作成
     session = AgentSession(
@@ -205,7 +209,9 @@ async def entrypoint(ctx: JobContext):
             model='nova-2-general'
         ),
         llm=openai.LLM(
-            model='gpt-4.1-nano',
+            model=get_optional_env('OPENROUTER_MODEL', 'gpt-4.1-nano'),
+            api_key=get_optional_env('OPENROUTER_API_KEY'),
+            base_url=get_optional_env('OPENROUTER_BASE_URL'),
         ),
         tts=cartesia.TTS(
             voice='1e1f6149-cd89-4073-82a3-339d32c15ad9',  # 日本語対応の音声ID
@@ -241,7 +247,7 @@ async def entrypoint(ctx: JobContext):
         await session.start(room=ctx.room, agent=agent)
         
         # 初期の挨拶
-        greeting = 'はい、お電話ありがとうございます。新党チームみらいの、党首、あんの、たかひろ、のAIです。もしよろしければ、今回お電話をくださったきっかけから、お伺いしてもよろしいですか？'
+        greeting = 'はい、お電話ありがとうございます。新党チームみらいの、党首、あんの、たかひろ、のAIです。本人の代わりに、私がみなさんのご意見やご質問をお聞きし、個人情報が残らない形で参考にさせていただきます。もしよろしければ、今回お電話をくださったきっかけから、お伺いしてもよろしいですか？'
         recorder.add_message("agent", greeting)
         await session.say(
             greeting,

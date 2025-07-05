@@ -1,5 +1,10 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+# .envファイルを読み込み、既存の環境変数を上書きする
+# この行をコードのできるだけ早い段階で呼び出します
+load_dotenv(override=True)
 
 
 def verify_env(keys: list[str]) -> dict[str, str]:
@@ -12,3 +17,8 @@ def verify_env(keys: list[str]) -> dict[str, str]:
             sys.exit(1)
         result[key] = value
     return result
+
+
+def get_optional_env(key: str, default: str = None) -> str:
+    """オプションの環境変数を取得する"""
+    return os.environ.get(key, default)
