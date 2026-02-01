@@ -12,9 +12,9 @@
     "clean": "gts clean",
     "build": "tsc",
     "fix": "gts fix",
-    "agent": "dotenvx run -f .env.local -- tsx src/agent.ts dev",
-    "setup:twilio": "dotenvx run -f .env.local -- tsx src/setup-twilio.ts",
-    "setup:livekit": "dotenvx run -f .env.local -- tsx src/setup-livekit.ts"
+    "agent": "dotenvx run -f .env -- tsx src/agent.ts dev",
+    "setup:twilio": "dotenvx run -f .env -- tsx src/setup-twilio.ts",
+    "setup:livekit": "dotenvx run -f .env -- tsx src/setup-livekit.ts"
   },
   "repository": {
     "type": "git",
@@ -33,7 +33,9 @@
     "@livekit/agents-plugin-openai": "^0.9.0",
     "@livekit/agents-plugin-silero": "^0.5.7",
     "@livekit/rtc-node": "^0.13.8",
+    "@types/node-fetch": "^2.6.12",
     "livekit-server-sdk": "^2.10.2",
+    "node-fetch": "^3.3.2",
     "twilio": "^5.5.1"
   },
   "devDependencies": {
