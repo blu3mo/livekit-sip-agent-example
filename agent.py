@@ -5,7 +5,7 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions, WorkerOptions, llm
-from livekit.plugins import cartesia, deepgram, openai, silero
+from livekit.plugins import cartesia, deepgram, fishaudio, openai, silero
 
 from env import verify_env, get_optional_env
 from conversation_recorder import ConversationRecorder
@@ -295,6 +295,27 @@ async def entrypoint(ctx: JobContext):
     # 参加者情報を記録
     recorder.set_participant(participant.identity)
     
+    # TTSプロバイダーを選択（環境変数 TTS_PROVIDER で切り替え: cartesia / fishaudio）
+    tts_provider = get_optional_env('TTS_PROVIDER', 'cartesia').lower()
+
+    if tts_provider == 'fishaudio':
+        fish_reference_id = get_optional_env('FISH_AUDIO_REFERENCE_ID', '')
+        tts_kwargs = {
+            'model': get_optional_env('FISH_AUDIO_MODEL', 's1'),
+            'latency_mode': get_optional_env('FISH_AUDIO_LATENCY', 'balanced'),
+        }
+        if fish_reference_id:
+            tts_kwargs['reference_id'] = fish_reference_id
+        tts = fishaudio.TTS(**tts_kwargs)
+        print(f"Using Fish Audio TTS")
+    else:
+        tts = cartesia.TTS(
+            voice='1e1f6149-cd89-4073-82a3-339d32c15ad9',  # 日本語対応の音声ID
+            model='sonic-2',
+            language='ja',
+        )
+        print(f"Using Cartesia TTS")
+
     # AgentSessionを作成
     session = AgentSession(
         stt=deepgram.STT(
@@ -306,11 +327,7 @@ async def entrypoint(ctx: JobContext):
             api_key=get_optional_env('OPENROUTER_API_KEY'),
             base_url=get_optional_env('OPENROUTER_BASE_URL'),
         ),
-        tts=cartesia.TTS(
-            voice='1e1f6149-cd89-4073-82a3-339d32c15ad9',  # 日本語対応の音声ID
-            model='sonic-2',
-            language='ja',
-        ),
+        tts=tts,
         vad=silero.VAD.load(),
     )
     
